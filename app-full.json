@@ -1,0 +1,11 @@
+{
+  "Environment": 0,
+  "Listen": "localhost:8081",
+  "Modules": {
+    "Public": {"Type": 1, "Path": "/", "Root": "{WorkingDir}/public"},
+    "Passport": {"Type": 2, "DB": "Passport"}
+  },
+  "DB": {
+    "Passport": {"Type": "mysql", "DSN": "user:pass@tcp(localhost:3306)/passport?charset=utf8", "Profiling": false}
+  }
+}
