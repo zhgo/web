@@ -20,7 +20,7 @@ func Url(m string, c string, a string, args ...interface{}) string {
 }
 
 func Misc(p string) string {
-	f, s := App.FileServers["Misc"]
+	f, s := App.Modules["Public"]
 	if s == false {
 		log.Printf("misc file server config not exists\n")
 		return ""
@@ -30,7 +30,7 @@ func Misc(p string) string {
 }
 
 func FavUI(p string) string {
-	f, s := App.FileServers["FavUI"]
+	f, s := App.Modules["Public"]
 	if s == false {
 		log.Printf("FavUI config not exists\n")
 		return ""

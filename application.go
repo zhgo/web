@@ -27,6 +27,9 @@ type Application struct {
 	// Environment 0:development 1:testing 2:staging 3:production
 	Environment int8
 
+	// Listen address and port
+	Listen string
+
 	// module list
 	Modules map[string]Module
 
@@ -34,21 +37,33 @@ type Application struct {
 	DB map[string]db.Config
 }
 
+func init() {
+	App.Init(WorkingDir + "/suite.json")
+}
 func (p *Application) Init(path string) {
-	//load
+	// load
 	r := map[string]string{"{WorkingDir}": WorkingDir}
 	config.LoadJSONFile(p, path, r)
 
-	//default module
+	// default module
 	if p.Modules == nil {
 		p.Modules = make(map[string]Module)
+		p.Modules["Public"] = Module{Type: 1, Path: "/", Root: WorkingDir + "/public"}
+	}
+
+	// default listen
+	for k, v := range p.Modules {
+		if v.Listen == "" {
+			v.Listen = p.Listen
+			p.Modules[k] = v
+		}
 	}
 
 	if p.DB == nil {
 		p.DB = make(map[string]db.Config)
 	}
 
-	//log.Printf("%#v\n", Conf)
+	log.Printf("%#v\n", p)
 }
 
 // Start new HTPP server
