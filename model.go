@@ -45,7 +45,7 @@ type Model struct {
 func (m *Model) Init(moduleName string, tableName string, t interface{}) {
 	module, s := App.Modules[moduleName] //cannot get map element ptr directly
 	if s == false {
-		log.Fatal(errors.New("module config not found"))
+		log.Fatal(errors.New("module config not found: " + moduleName))
 	}
 
 	primary, fields := db.TableFields(t)
