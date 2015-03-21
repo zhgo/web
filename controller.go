@@ -29,7 +29,9 @@ func (c *Controller) IndexErr(status int16, msg string) Result {
 }
 
 //new router register
-func NewController(c interface{}) {
+func NewController(module string, c interface{}) {
 	value := reflect.ValueOf(c)
+
+	//controllers[value.Elem().Type().Name()] = value
 	controllers[value.Elem().Type().Name()] = value
 }

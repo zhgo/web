@@ -6,15 +6,13 @@ package web
 
 import (
 	"github.com/zhgo/config"
+	"github.com/zhgo/core"
 	"github.com/zhgo/db"
 	"log"
 	"net/http"
 	"reflect"
 	"strconv"
 )
-
-// root path
-var WorkingDir string = config.WorkingDir()
 
 // App
 var App Application
@@ -31,7 +29,7 @@ type Application struct {
 	Listen string
 
 	// module list
-	Modules map[string]Module
+	Modules map[string]core.Module
 
 	// database connection string
 	DB map[string]db.Config
@@ -47,8 +45,8 @@ func (p *Application) Init(path string) {
 
 	// default module
 	if p.Modules == nil {
-		p.Modules = make(map[string]Module)
-		p.Modules["Public"] = Module{Type: 1, Path: "/", Root: WorkingDir + "/public"}
+		p.Modules = make(map[string]core.Module)
+		p.Modules["Public"] = core.Module{Type: 1, Path: "/", Root: WorkingDir + "/public"}
 	}
 
 	// default listen
@@ -59,9 +57,13 @@ func (p *Application) Init(path string) {
 		}
 	}
 
+    core.Modules = p.Modules
+
 	if p.DB == nil {
 		p.DB = make(map[string]db.Config)
 	}
+
+    db.Configs = p.DB
 
 	log.Printf("%#v\n", p)
 }
