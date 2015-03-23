@@ -1,7 +1,0 @@
-{
-    "Environment": 0,
-    "Listen": "localhost:8081",
-    "DB": {
-        "System": {"Type": "mysql", "DSN": "user:pass@tcp(localhost:3306)/system?charset=utf8", "Profiling": false}
-    }
-}

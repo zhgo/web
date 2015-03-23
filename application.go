@@ -6,13 +6,45 @@ package web
 
 import (
 	"github.com/zhgo/config"
-	"github.com/zhgo/core"
-	"github.com/zhgo/db"
+	"github.com/zhgo/orm"
 	"log"
 	"net/http"
 	"reflect"
 	"strconv"
 )
+
+// Root path
+var WorkingDir string = config.WorkingDir()
+
+// Module struct
+type Module struct {
+    // module name
+    Name string
+
+    // key of DSN
+    DB orm.DB
+}
+
+// Module list
+var Modules map[string]Module
+
+// Host struct
+type Host struct {
+    //
+    Name string
+
+    // Listen
+    Listen string
+
+    // Path
+    Path string
+
+    // Root
+    Root string
+}
+
+// Host list
+var Hosts map[string]Host
 
 // App
 var App Application
