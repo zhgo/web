@@ -6,7 +6,7 @@ package web
 
 import (
 	"github.com/zhgo/config"
-	"github.com/zhgo/orm"
+	"github.com/zhgo/db"
 	"log"
 	"net/http"
 	"reflect"
@@ -21,8 +21,11 @@ type Module struct {
     // module name
     Name string
 
+    // Listen
+    Listen string
+
     // key of DSN
-    DB orm.DB
+    DB db.DB
 }
 
 // Module list
@@ -60,11 +63,14 @@ type Application struct {
 	// Listen address and port
 	Listen string
 
+    // Host list
+    Hosts map[string]Host
+
 	// module list
-	Modules map[string]core.Module
+	Modules map[string]Module
 
 	// database connection string
-	DB map[string]db.Config
+	//DB map[string]db.Config
 }
 
 func init() {
@@ -75,10 +81,15 @@ func (p *Application) Init(path string) {
 	r := map[string]string{"{WorkingDir}": WorkingDir}
 	config.LoadJSONFile(p, path, r)
 
+	// default host
+	if p.Hosts == nil {
+		p.Hosts = make(map[string]Host)
+		p.Hosts["Public"] = Host{Path: "/", Root: WorkingDir + "/public"}
+	}
+
 	// default module
 	if p.Modules == nil {
-		p.Modules = make(map[string]core.Module)
-		p.Modules["Public"] = core.Module{Type: 1, Path: "/", Root: WorkingDir + "/public"}
+		p.Modules = make(map[string]Module)
 	}
 
 	// default listen
@@ -89,13 +100,13 @@ func (p *Application) Init(path string) {
 		}
 	}
 
-    core.Modules = p.Modules
+    Modules = p.Modules
 
-	if p.DB == nil {
+	/*if p.DB == nil {
 		p.DB = make(map[string]db.Config)
 	}
 
-    db.Configs = p.DB
+    db.Configs = p.DB*/
 
 	log.Printf("%#v\n", p)
 }
@@ -104,6 +115,23 @@ func (p *Application) Init(path string) {
 func (p *Application) NewServer(fn actionLoadFunc) {
 	muxList := make(map[string]*http.ServeMux)
 
+	// hosts
+	for _, m := range p.Hosts {
+		_, s := muxList[m.Listen]
+		if s == false {
+			muxList[m.Listen] = http.NewServeMux()
+		}
+
+        if m.Path == "/" {
+            muxList[m.Listen].Handle(m.Path, http.FileServer(http.Dir(m.Root)))
+        } else {
+            // To serve a directory on disk (/tmp) under an alternate URL
+            // path (/tmpfiles/), use StripPrefix to modify the request
+            // URL's path before the FileServer sees it:
+            muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
+        }
+	}
+
 	// modules
 	for mName, m := range p.Modules {
 		_, s := muxList[m.Listen]
@@ -111,19 +139,7 @@ func (p *Application) NewServer(fn actionLoadFunc) {
 			muxList[m.Listen] = http.NewServeMux()
 		}
 
-		switch m.Type {
-		case 1:
-			if m.Path == "/" {
-				muxList[m.Listen].Handle(m.Path, http.FileServer(http.Dir(m.Root)))
-			} else {
-				// To serve a directory on disk (/tmp) under an alternate URL
-				// path (/tmpfiles/), use StripPrefix to modify the request
-				// URL's path before the FileServer sees it:
-				muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
-			}
-		case 2:
-			muxList[m.Listen].HandleFunc("/"+mName+"/", newHandler(fn))
-		}
+        muxList[m.Listen].HandleFunc("/"+mName+"/", newHandler(fn))
 	}
 
 	//log.Printf("%#v\n", muxList)
