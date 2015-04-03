@@ -13,8 +13,23 @@ import (
 	"strconv"
 )
 
-// Root path
-var WorkingDir string = config.WorkingDir()
+// Application struct
+type Application struct {
+    // Environment 0:development 1:testing 2:staging 3:production
+    Environment int8
+
+    // Listen address and port
+    Listen string
+
+    // Host list
+    Hosts map[string]Host
+
+    // module list
+    Modules map[string]Module
+
+    // database connection string
+    //DB map[string]db.Config
+}
 
 // Module struct
 type Module struct {
@@ -27,9 +42,6 @@ type Module struct {
     // key of DSN
     DB db.DB
 }
-
-// Module list
-var Modules map[string]Module
 
 // Host struct
 type Host struct {
@@ -46,36 +58,19 @@ type Host struct {
     Root string
 }
 
-// Host list
-var Hosts map[string]Host
+// Action load function
+type actionLoadFunc func(r *Request) Result
+
+// Root path
+var WorkingDir string = config.WorkingDir()
 
 // App
 var App Application
 
-// Action load function
-type actionLoadFunc func(r *Request) Result
-
-// Application struct
-type Application struct {
-	// Environment 0:development 1:testing 2:staging 3:production
-	Environment int8
-
-	// Listen address and port
-	Listen string
-
-    // Host list
-    Hosts map[string]Host
-
-	// module list
-	Modules map[string]Module
-
-	// database connection string
-	//DB map[string]db.Config
-}
-
 func init() {
-	App.Init(WorkingDir + "/suite.json")
+	App.Init(WorkingDir + "/example.json")
 }
+
 func (p *Application) Init(path string) {
 	// load
 	r := map[string]string{"{WorkingDir}": WorkingDir}
@@ -95,12 +90,13 @@ func (p *Application) Init(path string) {
 	// default listen
 	for k, v := range p.Modules {
 		if v.Listen == "" {
-			v.Listen = p.Listen
-			p.Modules[k] = v
+			//v.Listen = p.Listen
+			//p.Modules[k] = v
+
+            // TODO: cannot assign to p.Modules[k].Listen
+			p.Modules[k].Listen = p.Listen
 		}
 	}
-
-    Modules = p.Modules
 
 	/*if p.DB == nil {
 		p.DB = make(map[string]db.Config)
