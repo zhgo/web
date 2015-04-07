@@ -6,6 +6,7 @@ package web
 
 import (
 	"github.com/zhgo/config"
+	"github.com/zhgo/kernel"
 	"github.com/zhgo/db"
 	"log"
 	"net/http"
@@ -18,17 +19,14 @@ type Application struct {
     // Environment 0:development 1:testing 2:staging 3:production
     Environment int8
 
+    // module list
+    Modules map[string]Module
+
     // Listen address and port
     Listen string
 
     // Host list
     Hosts map[string]Host
-
-    // module list
-    Modules map[string]Module
-
-    // database connection string
-    //DB map[string]db.Config
 }
 
 // Module struct
@@ -36,11 +34,11 @@ type Module struct {
     // module name
     Name string
 
-    // Listen
-    Listen string
-
     // key of DSN
     DB db.DB
+
+    // Listen
+    Listen string
 }
 
 // Host struct
@@ -58,65 +56,71 @@ type Host struct {
     Root string
 }
 
+//action result
+type Result struct {
+    //status
+    Num int64
+
+    //Message
+    Msg string
+}
+
 // Action load function
 type actionLoadFunc func(r *Request) Result
-
-// Root path
-var WorkingDir string = config.WorkingDir()
 
 // App
 var App Application
 
-func init() {
-	App.Init(WorkingDir + "/example.json")
-}
+// *http.ServeMux
+var muxList map[string]*http.ServeMux = make(map[string]*http.ServeMux)
 
-func (p *Application) Init(path string) {
-	// load
-	r := map[string]string{"{WorkingDir}": WorkingDir}
-	config.LoadJSONFile(p, path, r)
+// Init
+func (app *Application) Init(path string) {
+	// Load config file
+	r := map[string]string{"{WorkingDir}": kernel.WorkingDir}
+	config.LoadJSONFileAdv(app, path, r)
 
-	// default host
-	if p.Hosts == nil {
-		p.Hosts = make(map[string]Host)
-		p.Hosts["Public"] = Host{Path: "/", Root: WorkingDir + "/public"}
+	// Default module
+	if app.Modules == nil {
+        app.Modules = make(map[string]Module)
 	}
 
-	// default module
-	if p.Modules == nil {
-		p.Modules = make(map[string]Module)
-	}
+    // Default host
+    if app.Hosts == nil {
+        app.Hosts = make(map[string]Host)
+        app.Hosts["Public"] = Host{Path: "/", Root: kernel.WorkingDir + "/public"}
+    }
 
-	// default listen
-	for k, v := range p.Modules {
+    // Module property
+	for k, v := range app.Modules {
+        // app.Modules[k].Listen = app.Listen // cannot assign to p.Modules[k].Listen
+        v.Name = k
 		if v.Listen == "" {
-			//v.Listen = p.Listen
-			//p.Modules[k] = v
-
-            // TODO: cannot assign to p.Modules[k].Listen
-			p.Modules[k].Listen = p.Listen
+			v.Listen = app.Listen
 		}
+        app.Modules[k] = v
 	}
 
-	/*if p.DB == nil {
-		p.DB = make(map[string]db.Config)
+    // Host property
+	for k, v := range app.Hosts {
+        v.Name = k
+		if v.Listen == "" {
+			v.Listen = app.Listen
+		}
+        app.Hosts[k] = v
 	}
 
-    db.Configs = p.DB*/
-
-	log.Printf("%#v\n", p)
+	log.Printf("%#v\n", app)
+	log.Printf("%#v\n", controllers)
 }
 
-// Start new HTPP server
-func (p *Application) NewServer(fn actionLoadFunc) {
-	muxList := make(map[string]*http.ServeMux)
-
-	// hosts
-	for _, m := range p.Hosts {
-		_, s := muxList[m.Listen]
-		if s == false {
-			muxList[m.Listen] = http.NewServeMux()
-		}
+func (p *Application) Load(fn actionLoadFunc) {
+    // hosts
+    for _, m := range p.Hosts {
+        _, s := muxList[m.Listen]
+        if s == false {
+            muxList[m.Listen] = http.NewServeMux()
+        }
 
         if m.Path == "/" {
             muxList[m.Listen].Handle(m.Path, http.FileServer(http.Dir(m.Root)))
@@ -126,18 +130,21 @@ func (p *Application) NewServer(fn actionLoadFunc) {
             // URL's path before the FileServer sees it:
             muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
         }
-	}
+    }
 
-	// modules
-	for mName, m := range p.Modules {
-		_, s := muxList[m.Listen]
-		if s == false {
-			muxList[m.Listen] = http.NewServeMux()
-		}
+    // modules
+    for mName, m := range p.Modules {
+        _, s := muxList[m.Listen]
+        if s == false {
+            muxList[m.Listen] = http.NewServeMux()
+        }
 
         muxList[m.Listen].HandleFunc("/"+mName+"/", newHandler(fn))
-	}
+    }
+}
 
+// Start HTPP server
+func (p *Application) Start() {
 	//log.Printf("%#v\n", muxList)
 
 	l := len(muxList)
@@ -149,15 +156,15 @@ func (p *Application) NewServer(fn actionLoadFunc) {
 
 		if i == l {
 			//why the last listenning not go?
-			newHost(listen, mux)
+            listenAndServe(listen, mux)
 		} else {
-			go newHost(listen, mux)
+			go listenAndServe(listen, mux)
 		}
 	}
 }
 
 //new host
-func newHost(listen string, mux *http.ServeMux) {
+func listenAndServe(listen string, mux *http.ServeMux) {
 	err := http.ListenAndServe(listen, mux)
 	if err != nil {
 		log.Fatal(err)
@@ -169,12 +176,18 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req := newRequest(r)
 
-		log.Printf("\n\n") //空行分隔
+		log.Printf("\n\n")
 		log.Printf("%#v\n", req)
 
-		controller, s := controllers[req.Module+req.Controller]
-		if s == false {
-			log.Printf("controller not found: %s%s\n", req.Module, req.Controller)
+        cm, ok := controllers[req.Module];
+		if !ok {
+			log.Printf("controller not found: %s\n", req.Module)
+			return
+		}
+
+		controller, ok := cm[req.Controller + "Controller"]
+		if !ok {
+			log.Printf("controller not found: %s::%s\n", req.Module, req.Controller)
 			return
 		}
 
@@ -182,7 +195,7 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 		if fn != nil {
 			req.inited = fn(req)
 			if req.inited.Num < 0 {
-				req.Controller = "Index"
+				req.Controller = "IndexController"
 				req.Action = "Err"
 
 				log.Printf("Load falure: %s\n", req.inited.Msg)
@@ -258,13 +271,4 @@ func paramConversion(kind reflect.Kind, arg string) (reflect.Value, error) {
 	}
 
 	return v, err
-}
-
-//action result
-type Result struct {
-	//status
-	Num int64
-
-	//Message
-	Msg string
 }

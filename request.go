@@ -14,20 +14,11 @@ type Request struct {
 	//Module name
 	Module string
 
-	//Lowercase
-	//ModuleLow string
-
 	//Controller name
 	Controller string
 
-	//Lowercase
-	//ControllerLow string
-
 	//Action name
 	Action string
-
-	//Lowercase
-	//ActionLow string
 
 	//Method arguments sli.
 	args []string

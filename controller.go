@@ -10,7 +10,7 @@ import (
 )
 
 //Registered controllers
-var controllers map[string]reflect.Value = make(map[string]reflect.Value)
+var controllers map[string]map[string]reflect.Value = make(map[string]map[string]reflect.Value)
 
 //controller struct
 type Controller struct {
@@ -30,8 +30,10 @@ func (c *Controller) IndexErr(status int16, msg string) Result {
 
 //new router register
 func NewController(module string, c interface{}) {
-	value := reflect.ValueOf(c)
+    if _, ok := controllers[module]; !ok {
+        controllers[module] = make(map[string]reflect.Value)
+    }
 
-	//controllers[value.Elem().Type().Name()] = value
-	controllers[value.Elem().Type().Name()] = value
+	value := reflect.ValueOf(c)
+	controllers[module][value.Elem().Type().Name()] = value
 }

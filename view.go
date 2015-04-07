@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strings"
 	"unicode"
+    "github.com/zhgo/kernel"
 )
 
 //funcMaps
@@ -60,8 +61,9 @@ func (w *View) realRender(ret Result) {
 
 		// new template
 		t := template.New("Layout").Funcs(funcMaps)
+        m := strings.ToLower(w.Request.Module)
 
-		layoutPath := fmt.Sprintf("%s/layout/normal.html", WorkingDir)
+		layoutPath := fmt.Sprintf("%s/web/%s/layout/normal.html", kernel.WorkingDir, m)
 		t, err := t.ParseFiles(layoutPath)
 		if err != nil {
 			log.Printf("%s\n", err)
@@ -69,10 +71,9 @@ func (w *View) realRender(ret Result) {
 		}
 
 		// view html
-		m := strings.ToLower(w.Request.Module)
 		c := methodToPath(w.Request.Controller)
 		a := methodToPath(w.Request.Action)
-		viewPath := fmt.Sprintf("%s/view/%s/%s_%s.html", WorkingDir, m, c, a)
+		viewPath := fmt.Sprintf("%s/web/%s/view/%s_%s.html", kernel.WorkingDir, m, c, a)
 
 		log.Printf("%#v\n", viewPath)
 
