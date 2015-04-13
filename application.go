@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+    "fmt"
 )
 
 // Application struct
@@ -98,6 +99,18 @@ func (app *Application) Init(path string) {
 		if v.Listen == "" {
 			v.Listen = app.Listen
 		}
+
+        // db.Connections
+        if v.DB.Follow != "" {
+            v.DB = app.Modules[v.DB.Follow].DB
+            // v.DB.Follow = ""
+        }
+        if v.DB.DSN != "" {
+            db.Connections[v.DB.Name] = &v.DB
+        }
+
+
+
         app.Modules[k] = v
 	}
 
@@ -174,32 +187,30 @@ func listenAndServe(listen string, mux *http.ServeMux) {
 //Every request run this function
 func newHandler(fn actionLoadFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		req := newRequest(r)
+        defer func() {
+            if r := recover(); r != nil {
+                log.Printf(r.(string))
+            }
+        }()
 
-		log.Printf("\n\n")
-		log.Printf("%#v\n", req)
+        req := newRequest(r)
+		log.Printf("\n\n%#v\n", req)
 
         cm, ok := controllers[req.Module];
 		if !ok {
-			log.Printf("controller not found: %s\n", req.Module)
-			return
+            panic(fmt.Sprintf("controller not found: %s\n", req.Module))
 		}
 
 		controller, ok := cm[req.Controller + "Controller"]
 		if !ok {
-			log.Printf("controller not found: %s::%s\n", req.Module, req.Controller)
-			return
+            panic(fmt.Sprintf("controller not found: %s::%s\n", req.Module, req.Controller))
 		}
 
-		//Invoke Load() function
+		//Invoke Load()
 		if fn != nil {
-			req.inited = fn(req)
-			if req.inited.Num < 0 {
-				req.Controller = "IndexController"
-				req.Action = "Err"
-
-				log.Printf("Load falure: %s\n", req.inited.Msg)
-			}
+            if req.inited = fn(req); req.inited.Num < 0 {
+                panic(fmt.Sprintf("Load falure: %s\n", req.inited.Msg))
+            }
 		}
 
 		rq := controller.Elem().FieldByName("Request")
@@ -214,45 +225,38 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 
 		//action
 		action := controller.MethodByName(method)
-		if action.IsValid() {
-			log.Printf("method [%s] found\n", method)
-
-			typ := action.Type()
-			numIn := typ.NumIn()
-
-			if len(req.args) >= numIn {
-				pass := true
-				in := make([]reflect.Value, numIn)
-
-				for i := 0; i < numIn; i++ {
-					actionIn := typ.In(i)
-					kind := actionIn.Kind()
-					v, err := paramConversion(kind, req.args[i])
-					if err != nil {
-						pass = false
-						log.Printf("string convert to %s failure: %s\n", kind, req.args[i])
-					} else {
-						in[i] = v
-						req.Args[actionIn.Name()] = v
-					}
-				}
-
-				if pass == true {
-					resultSli := action.Call(in)
-					result := resultSli[0].Interface().(Result)
-					//log.Printf("%#v\n", result)
-					view.realRender(result)
-				} else {
-					log.Printf("%s's paramters failure\n", method)
-				}
-			} else {
-				log.Printf("method [%s]'s in arguments wrong\n", method)
-			}
-
-		} else {
-			log.Printf("method [%s] not found\n", method)
+		if action.IsValid() == false {
+            panic(fmt.Sprintf("method [%s] not found\n", method))
 		}
-	}
+
+        log.Printf("method [%s] found\n", method)
+
+        typ := action.Type()
+        numIn := typ.NumIn()
+
+        if len(req.args) < numIn {
+            panic(fmt.Sprintf("method [%s]'s in arguments wrong\n", method))
+        }
+
+        in := make([]reflect.Value, numIn)
+
+        for i := 0; i < numIn; i++ {
+            actionIn := typ.In(i)
+            kind := actionIn.Kind()
+            v, err := paramConversion(kind, req.args[i])
+            if err != nil {
+                panic(fmt.Sprintf("%s's paramters failure: string convert to %s failure: %s\n", method, kind, req.args[i]))
+            }
+
+            in[i] = v
+            req.Args[actionIn.Name()] = v
+        }
+
+        resultSli := action.Call(in)
+        result := resultSli[0].Interface().(Result)
+        //log.Printf("%#v\n", result)
+        view.realRender(result)
+    }
 }
 
 func paramConversion(kind reflect.Kind, arg string) (reflect.Value, error) {
