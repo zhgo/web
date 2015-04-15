@@ -73,7 +73,7 @@ type actionLoadFunc func(r *Request) Result
 var App Application
 
 // *http.ServeMux
-var muxList map[string]*http.ServeMux = make(map[string]*http.ServeMux)
+var muxList = make(map[string]*http.ServeMux)
 
 // Init
 func (app *Application) Init(path string) {
