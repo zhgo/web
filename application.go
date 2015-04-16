@@ -36,8 +36,8 @@ type Module struct {
     // module name
     Name string
 
-    // key of DSN
-    DB db.DB
+    // key of DB Server
+    DB db.Server
 
     // Listen
     Listen string
@@ -107,7 +107,7 @@ func (app *Application) Init(path string) {
             // v.DB.Follow = ""
         }
         if v.DB.DSN != "" {
-            db.Connections[v.DB.Name] = &v.DB
+            db.Servers[v.DB.Name] = &v.DB
         }
 
         app.Modules[k] = v
