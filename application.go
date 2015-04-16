@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strconv"
     "fmt"
+    "runtime"
 )
 
 // Application struct
@@ -109,8 +110,6 @@ func (app *Application) Init(path string) {
             db.Connections[v.DB.Name] = &v.DB
         }
 
-
-
         app.Modules[k] = v
 	}
 
@@ -127,11 +126,11 @@ func (app *Application) Init(path string) {
 	log.Printf("%#v\n", controllers)
 }
 
+// Load
 func (p *Application) Load(fn actionLoadFunc) {
     // hosts
     for _, m := range p.Hosts {
-        _, s := muxList[m.Listen]
-        if s == false {
+        if _, ok := muxList[m.Listen]; !ok {
             muxList[m.Listen] = http.NewServeMux()
         }
 
@@ -147,8 +146,7 @@ func (p *Application) Load(fn actionLoadFunc) {
 
     // modules
     for mName, m := range p.Modules {
-        _, s := muxList[m.Listen]
-        if s == false {
+        if _, ok := muxList[m.Listen]; !ok {
             muxList[m.Listen] = http.NewServeMux()
         }
 
@@ -160,28 +158,26 @@ func (p *Application) Load(fn actionLoadFunc) {
 func (p *Application) Start() {
 	//log.Printf("%#v\n", muxList)
 
+    runtime.GOMAXPROCS(runtime.NumCPU())
 	l := len(muxList)
-	i := 0
-	for listen, mux := range muxList {
-		i++
+    sem := make(chan int, l)
 
-		//log.Printf("%#v\n", mux)
+    for listen, mux := range muxList {
+        go listenAndServe(listen, mux, sem)
+    }
 
-		if i == l {
-			//why the last listenning not go?
-            listenAndServe(listen, mux)
-		} else {
-			go listenAndServe(listen, mux)
-		}
-	}
+    for i := 0; i < l; i++ {
+        <-sem
+    }
 }
 
 //new host
-func listenAndServe(listen string, mux *http.ServeMux) {
+func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
 	err := http.ListenAndServe(listen, mux)
 	if err != nil {
 		log.Fatal(err)
 	}
+    sem <- 0
 }
 
 //Every request run this function
