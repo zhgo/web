@@ -26,15 +26,12 @@ type Request struct {
 	//Method arguments map
 	Args map[string]interface{}
 
-	//Inited status
-	inited Result
-
 	//*http.Request
 	HTTPRequest *http.Request
 }
 
 //New request
-func newRequest(r *http.Request) *Request {
+func NewRequest(r *http.Request) *Request {
 	nodes := strings.Split(r.URL.Path, "/")
 	l := len(nodes)
 

@@ -104,6 +104,11 @@ func (w *View) realRender(ret Result) {
 	}
 }
 
+// New View
+func NewView(r *Request, rw http.ResponseWriter) *View {
+    return &View{Request: r, Data: make(map[string]interface{}, 0), ResponseWriter: rw}
+}
+
 // for example: transfer BrowseBySet to browse_by_set
 func methodToPath(method string) string {
 	var words []string

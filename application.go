@@ -189,14 +189,13 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
             }
         }()
 
-        req := newRequest(r)
+        req := NewRequest(r)
 		log.Printf("\n\n%#v\n", req)
 
         cm, ok := controllers[req.Module];
 		if !ok {
             panic(fmt.Sprintf("controller not found: %s\n", req.Module))
 		}
-
 		controller, ok := cm[req.Controller + "Controller"]
 		if !ok {
             panic(fmt.Sprintf("controller not found: %s::%s\n", req.Module, req.Controller))
@@ -204,18 +203,17 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 
 		//Invoke Load()
 		if fn != nil {
-            if req.inited = fn(req); req.inited.Num < 0 {
-                panic(fmt.Sprintf("Load falure: %s\n", req.inited.Msg))
+            if inited := fn(req); inited.Num < 0 {
+                panic(fmt.Sprintf("Load falure: %s\n", inited.Msg))
             }
 		}
 
 		rq := controller.Elem().FieldByName("Request")
 		rq.Set(reflect.ValueOf(req))
 
-		view := View{Request: req, Data: make(map[string]interface{}, 0), ResponseWriter: w}
-
-		rw := controller.Elem().FieldByName("View")
-		rw.Set(reflect.ValueOf(&view))
+		view := NewView(req, w)
+		vw := controller.Elem().FieldByName("View")
+		vw.Set(reflect.ValueOf(view))
 
 		method := req.Action
 
@@ -229,19 +227,17 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 
         typ := action.Type()
         numIn := typ.NumIn()
-
         if len(req.args) < numIn {
             panic(fmt.Sprintf("method [%s]'s in arguments wrong\n", method))
         }
 
         in := make([]reflect.Value, numIn)
-
         for i := 0; i < numIn; i++ {
             actionIn := typ.In(i)
             kind := actionIn.Kind()
-            v, err := paramConversion(kind, req.args[i])
+            v, err := parameterConversion(req.args[i], kind)
             if err != nil {
-                panic(fmt.Sprintf("%s's paramters failure: string convert to %s failure: %s\n", method, kind, req.args[i]))
+                panic(fmt.Sprintf("%s's paramters error, string convert to %s failed: %s\n", method, kind, req.args[i]))
             }
 
             in[i] = v
@@ -250,24 +246,24 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 
         resultSli := action.Call(in)
         result := resultSli[0].Interface().(Result)
-        //log.Printf("%#v\n", result)
         view.realRender(result)
     }
 }
 
-func paramConversion(kind reflect.Kind, arg string) (reflect.Value, error) {
+// Parameter Conversion
+func parameterConversion(str string, kind reflect.Kind) (reflect.Value, error) {
 	var v reflect.Value
 	var err error
 
 	switch kind {
 	case reflect.String:
-		v = reflect.ValueOf(arg)
+		v = reflect.ValueOf(str)
 	case reflect.Int64:
-		var i64 int64
-		i64, err = strconv.ParseInt(arg, 10, 64)
+        var i64 int64
+		i64, err = strconv.ParseInt(str, 10, 64)
 		v = reflect.ValueOf(i64)
 	default:
-		log.Printf("string convert to int failure: %s\n", arg)
+		log.Printf("string convert to int failure: %s\n", str)
 	}
 
 	return v, err
