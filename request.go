@@ -52,13 +52,3 @@ func NewRequest(r *http.Request) *Request {
 
 	return &req
 }
-
-// for example: transfer browse_by_set to BrowseBySet
-func pathToMethod(path string) string {
-	var method string
-	sli := strings.Split(path, "_")
-	for _, v := range sli {
-		method += strings.Title(v)
-	}
-	return method
-}

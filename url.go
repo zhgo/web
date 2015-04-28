@@ -9,41 +9,27 @@ import (
 	"log"
 )
 
-func Url(m string, c string, a string, args ...interface{}) string {
-	module, s := App.Modules[m]
-	if s == false {
-		log.Printf("module not exists: %s\n", m)
+func URL(m string, c string, a string, args ...interface{}) string {
+	module, ok := App.Modules[m]
+	if !ok {
+		log.Printf("Module [%s] not exists\n", m)
 		return ""
 	}
 
-	return fmt.Sprintf("http://%s/%s/%s", module.Listen, c, a)
+    str := ""
+    for _, v := range args {
+        str += fmt.Sprintf("/%v", v)
+    }
+
+	return fmt.Sprintf("http://%s/%s/%s%s", module.Listen, c, a, str)
 }
 
-func Misc(p string) string {
-	f, s := App.Modules["Public"]
-	if s == false {
-		log.Printf("misc file server config not exists\n")
+func Pub(p string) string {
+	h, ok := App.Hosts["Public"]
+	if !ok {
+		log.Printf("Host [Public] not exists\n")
 		return ""
 	}
 
-	return fmt.Sprintf("http://%s%s", f.Listen, p)
-}
-
-func FavUI(p string) string {
-	f, s := App.Modules["Public"]
-	if s == false {
-		log.Printf("FavUI config not exists\n")
-		return ""
-	}
-
-	return fmt.Sprintf("http://%s%s", f.Listen, p)
-}
-
-func Theme(p string) string {
-	//theme
-	t := "default"
-
-	//full path
-	fp := fmt.Sprintf("/themes/%s%s", t, p)
-	return Misc(fp)
+	return fmt.Sprintf("http://%s%s", h.Listen, p)
 }

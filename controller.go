@@ -5,7 +5,6 @@
 package web
 
 import (
-	"log"
 	"reflect"
 )
 
@@ -19,13 +18,6 @@ type Controller struct {
 
 	//Responsewriter
 	View *View
-}
-
-//General error page
-func (c *Controller) IndexErr(status int16, msg string) Result {
-	log.Printf("SystemIndexErr\n")
-
-	return c.View.Render()
 }
 
 //new router register

@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"reflect"
-	"strconv"
     "fmt"
     "runtime"
 )
@@ -61,26 +60,22 @@ type Host struct {
 //action result
 type Result struct {
     //status
-    Num int64
+    Code int
 
     //Message
-    Msg string
+    Err string
 }
-
-// Action load function
-type actionLoadFunc func(r *Request) Result
-
-// App
-var App Application
-
-// *http.ServeMux
-var muxList = make(map[string]*http.ServeMux)
 
 // Init
 func (app *Application) Init(path string) {
 	// Load config file
 	r := map[string]string{"{WorkingDir}": kernel.WorkingDir}
 	config.LoadJSONFileAdv(app, path, r)
+
+    // Default Listen
+    if app.Listen == "" {
+        app.Listen = ":80"
+    }
 
 	// Default module
 	if app.Modules == nil {
@@ -90,6 +85,8 @@ func (app *Application) Init(path string) {
     // Default host
     if app.Hosts == nil {
         app.Hosts = make(map[string]Host)
+    }
+    if _, ok := app.Hosts["Public"]; !ok {
         app.Hosts["Public"] = Host{Path: "/", Root: kernel.WorkingDir + "/public"}
     }
 
@@ -127,7 +124,7 @@ func (app *Application) Init(path string) {
 }
 
 // Load
-func (p *Application) Load(fn actionLoadFunc) {
+func (p *Application) Load(fn ActionLoadFunc) {
     // hosts
     for _, m := range p.Hosts {
         if _, ok := muxList[m.Listen]; !ok {
@@ -150,7 +147,7 @@ func (p *Application) Load(fn actionLoadFunc) {
             muxList[m.Listen] = http.NewServeMux()
         }
 
-        muxList[m.Listen].HandleFunc("/"+mName+"/", newHandler(fn))
+        muxList[m.Listen].HandleFunc("/"+mName+"/", NewHandler(fn))
     }
 }
 
@@ -163,7 +160,7 @@ func (p *Application) Start() {
     sem := make(chan int, l)
 
     for listen, mux := range muxList {
-        go listenAndServe(listen, mux, sem)
+        go p.listenAndServe(listen, mux, sem)
     }
 
     for i := 0; i < l; i++ {
@@ -172,20 +169,30 @@ func (p *Application) Start() {
 }
 
 //new host
-func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
-	err := http.ListenAndServe(listen, mux)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (p *Application) listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
+    err := http.ListenAndServe(listen, mux)
+    if err != nil {
+        log.Fatal(err)
+    }
     sem <- 0
 }
 
+// Action load function
+type ActionLoadFunc func(r *Request) Result
+
+// App
+var App Application
+
+// *http.ServeMux
+var muxList = make(map[string]*http.ServeMux)
+
 //Every request run this function
-func newHandler(fn actionLoadFunc) http.HandlerFunc {
+func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
         defer func() {
             if r := recover(); r != nil {
                 log.Printf(r.(string))
+                http.Error(w, r.(string), http.StatusOK)
             }
         }()
 
@@ -194,17 +201,17 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 
         cm, ok := controllers[req.Module];
 		if !ok {
-            panic(fmt.Sprintf("controller not found: %s\n", req.Module))
+            panic(fmt.Sprintf("Controller [%s] not found\n", req.Module))
 		}
 		controller, ok := cm[req.Controller + "Controller"]
 		if !ok {
-            panic(fmt.Sprintf("controller not found: %s::%s\n", req.Module, req.Controller))
+            panic(fmt.Sprintf("Controller [%s::%s] not found\n", req.Module, req.Controller))
 		}
 
 		//Invoke Load()
 		if fn != nil {
-            if inited := fn(req); inited.Num < 0 {
-                panic(fmt.Sprintf("Load falure: %s\n", inited.Msg))
+            if inited := fn(req); inited.Code < 0 {
+                panic(fmt.Sprintf("Load falure: %s\n", inited.Err))
             }
 		}
 
@@ -220,51 +227,34 @@ func newHandler(fn actionLoadFunc) http.HandlerFunc {
 		//action
 		action := controller.MethodByName(method)
 		if action.IsValid() == false {
-            panic(fmt.Sprintf("method [%s] not found\n", method))
+            panic(fmt.Sprintf("Method [%s] not found\n", method))
 		}
 
-        log.Printf("method [%s] found\n", method)
+        log.Printf("Method [%s] found\n", method)
 
         typ := action.Type()
         numIn := typ.NumIn()
         if len(req.args) < numIn {
-            panic(fmt.Sprintf("method [%s]'s in arguments wrong\n", method))
+            panic(fmt.Sprintf("Method [%s]'s in arguments wrong\n", method))
         }
 
+        // Arguments
         in := make([]reflect.Value, numIn)
         for i := 0; i < numIn; i++ {
             actionIn := typ.In(i)
             kind := actionIn.Kind()
             v, err := parameterConversion(req.args[i], kind)
             if err != nil {
-                panic(fmt.Sprintf("%s's paramters error, string convert to %s failed: %s\n", method, kind, req.args[i]))
+                panic(fmt.Sprintf("%s paramters error, string convert to %s failed: %s\n", method, kind, req.args[i]))
             }
 
             in[i] = v
             req.Args[actionIn.Name()] = v
         }
 
+        // Run...
         resultSli := action.Call(in)
         result := resultSli[0].Interface().(Result)
-        view.realRender(result)
+        view.render(result)
     }
-}
-
-// Parameter Conversion
-func parameterConversion(str string, kind reflect.Kind) (reflect.Value, error) {
-	var v reflect.Value
-	var err error
-
-	switch kind {
-	case reflect.String:
-		v = reflect.ValueOf(str)
-	case reflect.Int64:
-        var i64 int64
-		i64, err = strconv.ParseInt(str, 10, 64)
-		v = reflect.ValueOf(i64)
-	default:
-		log.Printf("string convert to int failure: %s\n", str)
-	}
-
-	return v, err
 }
