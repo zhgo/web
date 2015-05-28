@@ -5,7 +5,7 @@
 package web
 
 import (
-	"github.com/zhgo/kernel"
+	"github.com/zhgo/console"
 	"github.com/zhgo/db"
 	"log"
 	"net/http"
@@ -56,20 +56,11 @@ type Host struct {
     Root string
 }
 
-//action result
-type Result struct {
-    //Status code
-    Code int
-
-    //Message
-    Err string
-}
-
 // Init
 func (app *Application) Init(path string) {
 	// Load config file
-	rep := map[string]string{"{WorkingDir}": kernel.WorkingDir}
-    cfg := kernel.NewConfig(kernel.ConfigFile, path, rep)
+	rep := map[string]string{"{WorkingDir}": console.WorkingDir}
+    cfg := console.NewConfig(console.ConfigFile, path, rep)
     cfg.Parse(app)
 
     // Default Listen
@@ -87,7 +78,7 @@ func (app *Application) Init(path string) {
         app.Hosts = make(map[string]Host)
     }
     if _, ok := app.Hosts["Public"]; !ok {
-        app.Hosts["Public"] = Host{Path: "/", Root: kernel.WorkingDir + "/public"}
+        app.Hosts["Public"] = Host{Path: "/", Root: console.WorkingDir + "/public"}
     }
 
     // Module property

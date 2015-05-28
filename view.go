@@ -11,7 +11,7 @@ import (
     "log"
     "net/http"
     "strings"
-    "github.com/zhgo/kernel"
+    "github.com/zhgo/console"
 )
 
 //View struct
@@ -46,7 +46,7 @@ func (w *View) render(ret Result) {
         t := template.New("Layout").Funcs(funcMap)
         m := strings.ToLower(w.Request.Module)
 
-        layoutPath := fmt.Sprintf("%s/web/%s/layout/normal.html", kernel.WorkingDir, m)
+        layoutPath := fmt.Sprintf("%s/web/%s/layout/normal.html", console.WorkingDir, m)
         t, err := t.ParseFiles(layoutPath)
         if err != nil {
             log.Printf("%s\n", err)
@@ -56,7 +56,7 @@ func (w *View) render(ret Result) {
         // view html
         c := methodToPath(w.Request.Controller)
         a := methodToPath(w.Request.Action)
-        viewPath := fmt.Sprintf("%s/web/%s/view/%s_%s.html", kernel.WorkingDir, m, c, a)
+        viewPath := fmt.Sprintf("%s/web/%s/view/%s_%s.html", console.WorkingDir, m, c, a)
 
         log.Printf("%#v\n", viewPath)
 

@@ -13,6 +13,15 @@ import (
     "unicode"
 )
 
+//action result
+type Result struct {
+    //Status code
+    Code int
+
+    //Message
+    Err string
+}
+
 //funcMap
 var funcMap = template.FuncMap{
     "FnURL": func(m string, c string, a string, args ...interface{}) string {
