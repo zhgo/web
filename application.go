@@ -59,9 +59,8 @@ type Host struct {
 // Init
 func (app *Application) Init(path string) {
 	// Load config file
-	rep := map[string]string{"{WorkingDir}": console.WorkingDir}
-    cfg := console.NewConfig(console.ConfigFile, path, rep)
-    cfg.Parse(app)
+	r := map[string]string{"{WorkingDir}": console.WorkingDir}
+    console.NewConfig(path).Replace(r).Parse(app)
 
     // Default Listen
     if app.Listen == "" {
@@ -110,8 +109,10 @@ func (app *Application) Init(path string) {
         app.Hosts[k] = v
 	}
 
-	log.Printf("%#v\n", app)
-	log.Printf("%#v\n", controllers)
+	//log.Printf("%#v\n", app)
+    console.Dump(app)
+	//log.Printf("%#v\n", controllers)
+    console.Dump(controllers)
 }
 
 // Load
