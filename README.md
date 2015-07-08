@@ -1,4 +1,4 @@
-# Web framework for golang
+# Web --- Web framework
 
 Golang MVC web framework.
 
