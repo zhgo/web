@@ -29,10 +29,10 @@ func (c *Controller) Add() interface{} {
 	}
 
 	if s, ok := db.Servers[App.Modules[c.Request.Module].DB.Name]; ok {
-		tbName := console.CamelcaseToUnderscore(c.Request.Module)
+		tbName := console.CamelcaseToUnderscore(c.Request.Controller)
 		r, err := s.InsertInto(tbName).Exec(d)
 		if err != nil {
-			return Result{-1, err.Error()}
+			return Result{-2, err.Error()}
 		}
 
 		return Result{r.LastInsertId, ""}
