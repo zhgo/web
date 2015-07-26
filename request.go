@@ -11,20 +11,20 @@ import (
 
 //Request struct, containe *http.Request, it's about to more variable.
 type Request struct {
-	//Module name
+	//Module
 	Module string
 
-	//Controller name
+	//Controller
 	Controller string
 
-	//Action name
+	//Action
 	Action string
 
-	//Method arguments sli.
-	args []string
-
-	//Method arguments map
+	//Method arguments as map
 	Args map[string]interface{}
+
+	//Method arguments as sli
+	args []string
 
 	//*http.Request
 	HTTPRequest *http.Request
@@ -41,10 +41,10 @@ func NewRequest(r *http.Request) *Request {
 		req.Module = nodes[1] //strings.Title(nodes[1])
 	}
 	if l > 2 && nodes[2] != "" {
-		req.Controller = nodes[2] //pathToMethod(nodes[2])
+		req.Controller = nodes[2]
 	}
 	if l > 3 && nodes[3] != "" {
-		req.Action = nodes[3] //pathToMethod(nodes[3])
+		req.Action = nodes[3]
 	}
 	if l > 4 {
 		req.args = nodes[4:]

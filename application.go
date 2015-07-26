@@ -57,6 +57,15 @@ type Host struct {
 	Root string
 }
 
+// Action load function
+type ActionLoadFunc func(r *Request) Result
+
+// App
+var App Application
+
+// *http.ServeMux
+var muxList = make(map[string]*http.ServeMux)
+
 // Init
 func (app *Application) Init(path string) {
 	// Load config file
@@ -169,15 +178,6 @@ func (p *Application) listenAndServe(listen string, mux *http.ServeMux, sem chan
 	}
 	sem <- 0
 }
-
-// Action load function
-type ActionLoadFunc func(r *Request) Result
-
-// App
-var App Application
-
-// *http.ServeMux
-var muxList = make(map[string]*http.ServeMux)
 
 //Every request run this function
 func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
