@@ -2,7 +2,6 @@
   "Environment": 0,
   "Listen": "localhost:8081",
   "Modules": {
-    "Collab": {"DB": {"Type": "mysql", "DSN": "user:pass@tcp(localhost:3306)/passport?charset=utf8"}},
     "Passport": {"DB": {"Type": "mysql", "DSN": "user:pass@tcp(localhost:3306)/passport?charset=utf8"}}
   },
   "Hosts": {

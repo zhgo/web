@@ -57,15 +57,6 @@ type Host struct {
 	Root string
 }
 
-// Action load function
-type ActionLoadFunc func(r *Request) Result
-
-// App
-var App Application
-
-// *http.ServeMux
-var muxList = make(map[string]*http.ServeMux)
-
 // Init
 func (app *Application) Init(path string) {
 	// Load config file
@@ -104,7 +95,7 @@ func (app *Application) Init(path string) {
 		}
 
 		if v.DB.DSN != "" {
-			db.Servers[v.DB.Name] = &v.DB
+			db.Servers[v.Name] = &v.DB
 		}
 
 		app.Modules[k] = v
@@ -185,19 +176,20 @@ func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf(r.(string))
-				http.Error(w, r.(string), http.StatusOK)
+				http.Error(w, r.(string), http.StatusBadRequest)
 			}
 		}()
 
-		req := NewRequest(r)
 		fmt.Print("\n\n")
+
+		req := NewRequest(r)
 		console.Dump(req)
 
 		cm, ok := controllers[req.Module]
 		if !ok {
 			panic(fmt.Sprintf("Controller [%s] not found\n", req.Module))
 		}
-		controller, ok := cm[req.Controller+"Controller"]
+		controller, ok := cm[req.Module+req.Controller]
 		if !ok {
 			panic(fmt.Sprintf("Controller [%s::%s] not found\n", req.Module, req.Controller))
 		}
@@ -224,7 +216,7 @@ func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
 
 		typ := action.Type()
 		numIn := typ.NumIn()
-		if len(req.args) < numIn {
+		if len(req.args) != numIn {
 			panic(fmt.Sprintf("Method [%s]'s in arguments wrong\n", method))
 		}
 
@@ -245,8 +237,13 @@ func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
 		// Run...
 		ret := action.Call(in)
 
+		result := ret[0].Interface().(Result)
+		if result.Err != "" {
+			panic(fmt.Sprintf("Execute error: %v\n", result.Err))
+		}
+
 		// JSON Marshal
-		v, err := json.Marshal(ret[0].Interface())
+		v, err := json.Marshal(result.Data)
 		if err != nil {
 			panic(fmt.Sprintf("json.Marshal: %v\n", err))
 		}

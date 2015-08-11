@@ -10,15 +10,6 @@ import (
 	"strconv"
 )
 
-// action result
-type Result struct {
-	// Data
-	Data interface{} `json:"data"`
-
-	// error
-	Err string `json:"err"`
-}
-
 // Parameter Conversion
 func parameterConversion(str string, kind reflect.Kind) (reflect.Value, error) {
 	var v reflect.Value

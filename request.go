@@ -5,37 +5,65 @@
 package web
 
 import (
+	"encoding/json"
+	"github.com/zhgo/db"
+	"log"
 	"net/http"
 	"strings"
 )
 
-//Request struct, containe *http.Request, it's about to more variable.
-type Request struct {
-	//Module
-	Module string
+type RequestBody struct {
+	// Condition
+	Cond db.Condition `json:"cond"`
 
-	//Controller
-	Controller string
-
-	//Action
-	Action string
-
-	//Method arguments as map
-	Args map[string]interface{}
-
-	//Method arguments as sli
-	args []string
-
-	//*http.Request
-	HTTPRequest *http.Request
+	// Insert/Update data
+	Data map[string]string `json:"data"`
 }
 
-//New request
+// Request struct, containe *http.Request, it's about to more variable.
+type Request struct {
+	// Module
+	Module string
+
+	// Controller
+	Controller string
+
+	// Action
+	Action string
+
+	// Method arguments as map
+	Args map[string]interface{}
+
+	// Method arguments as sli
+	args []string
+
+	// Posted body in json format.
+	Body RequestBody
+
+	// *http.Request
+	//HTTPRequest *http.Request
+}
+
+// New request
 func NewRequest(r *http.Request) *Request {
 	nodes := strings.Split(r.URL.Path, "/")
 	l := len(nodes)
 
-	req := Request{Module: "System", Controller: "Index", Action: "Index", args: make([]string, 0), Args: make(map[string]interface{}, 0), HTTPRequest: r}
+	jsonPost := RequestBody{}
+	err := json.NewDecoder(r.Body).Decode(&jsonPost)
+	if err != nil {
+		log.Printf("%v\n", err)
+	}
+
+	req := Request{
+		Module:     "Idm",
+		Controller: "Index",
+		Action:     "Index",
+		Args:       make(map[string]interface{}, 0),
+		args:       make([]string, 0),
+		Body:       jsonPost,
+		//HTTPRequest: r,
+	}
 
 	if l > 1 && nodes[1] != "" {
 		req.Module = nodes[1] //strings.Title(nodes[1])
