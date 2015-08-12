@@ -14,12 +14,14 @@ type Controller struct {
 	Request *Request
 }
 
-func (c *Controller) Success(data interface{}) Result {
-	return Result{data, ""}
+// Failure
+func (c *Controller) Fail(err error) Result {
+	return Result{"", err.Error()}
 }
 
-func (c *Controller) Failure(err error) Result {
-	return Result{"", err.Error()}
+// Success
+func (c *Controller) Done(data interface{}) Result {
+	return Result{data, ""}
 }
 
 // New router register
