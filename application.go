@@ -12,7 +12,6 @@ import (
 	"log"
 	"net/http"
 	"reflect"
-	"runtime"
 )
 
 // Application struct
@@ -20,14 +19,17 @@ type Application struct {
 	// Environment 0:development 1:testing 2:staging 3:production
 	Environment int8
 
-	// module list
-	Modules map[string]Module
-
 	// Listen address and port
 	Listen string
 
 	// Host list
 	Hosts map[string]Host
+
+	// module list
+	Modules map[string]Module
+
+	// *http.ServeMux
+	muxList map[string]*http.ServeMux
 }
 
 // Module struct
@@ -35,11 +37,11 @@ type Module struct {
 	// module name
 	Name string
 
-	// key of DB Server
-	DB db.Server
-
 	// Listen
 	Listen string
+
+	// key of DB Server
+	DB db.Server
 }
 
 // Host struct
@@ -68,17 +70,26 @@ func (app *Application) Init(path string) {
 		app.Listen = ":80"
 	}
 
-	// Default module
-	if app.Modules == nil {
-		app.Modules = make(map[string]Module)
-	}
-
 	// Default host
 	if app.Hosts == nil {
 		app.Hosts = make(map[string]Host)
 	}
 	if _, ok := app.Hosts["Public"]; !ok {
 		app.Hosts["Public"] = Host{Path: "/", Root: console.WorkingDir + "/public"}
+	}
+
+	// Host property
+	for k, v := range app.Hosts {
+		v.Name = k
+		if v.Listen == "" {
+			v.Listen = app.Listen
+		}
+		app.Hosts[k] = v
+	}
+
+	// Default module
+	if app.Modules == nil {
+		app.Modules = make(map[string]Module)
 	}
 
 	// Module property
@@ -101,14 +112,7 @@ func (app *Application) Init(path string) {
 		app.Modules[k] = v
 	}
 
-	// Host property
-	for k, v := range app.Hosts {
-		v.Name = k
-		if v.Listen == "" {
-			v.Listen = app.Listen
-		}
-		app.Hosts[k] = v
-	}
+	app.muxList = make(map[string]*http.ServeMux)
 
 	//log.Printf("%#v\n", app)
 	console.Dump(app)
@@ -117,43 +121,43 @@ func (app *Application) Init(path string) {
 }
 
 // Load
-func (p *Application) Load(fn ActionLoadFunc) {
+func (app *Application) Load(fn ActionLoadFunc) {
 	// hosts
-	for _, m := range p.Hosts {
-		if _, ok := muxList[m.Listen]; !ok {
-			muxList[m.Listen] = http.NewServeMux()
+	for _, m := range app.Hosts {
+		if _, ok := app.muxList[m.Listen]; !ok {
+			app.muxList[m.Listen] = http.NewServeMux()
 		}
 
 		if m.Path == "/" {
-			muxList[m.Listen].Handle(m.Path, http.FileServer(http.Dir(m.Root)))
+			app.muxList[m.Listen].Handle(m.Path, http.FileServer(http.Dir(m.Root)))
 		} else {
 			// To serve a directory on disk (/tmp) under an alternate URL
 			// path (/tmpfiles/), use StripPrefix to modify the request
 			// URL's path before the FileServer sees it:
-			muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
+			app.muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
 		}
 	}
 
 	// modules
-	for mName, m := range p.Modules {
-		if _, ok := muxList[m.Listen]; !ok {
-			muxList[m.Listen] = http.NewServeMux()
+	for mName, m := range app.Modules {
+		if _, ok := app.muxList[m.Listen]; !ok {
+			app.muxList[m.Listen] = http.NewServeMux()
 		}
 
-		muxList[m.Listen].HandleFunc("/"+mName+"/", NewHandler(fn))
+		app.muxList[m.Listen].HandleFunc("/"+mName+"/", handleRequest(fn))
 	}
+
+	//log.Printf("%#v\n", app.muxList)
+	console.Dump(app.muxList)
 }
 
 // Start HTPP server
-func (p *Application) Start() {
-	//log.Printf("%#v\n", muxList)
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	l := len(muxList)
+func (app *Application) Start() {
+	l := len(app.muxList)
 	sem := make(chan int, l)
 
-	for listen, mux := range muxList {
-		go p.listenAndServe(listen, mux, sem)
+	for listen, mux := range app.muxList {
+		go app.listenAndServe(listen, mux, sem)
 	}
 
 	for i := 0; i < l; i++ {
@@ -162,7 +166,7 @@ func (p *Application) Start() {
 }
 
 //new host
-func (p *Application) listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
+func (app *Application) listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
 	err := http.ListenAndServe(listen, mux)
 	if err != nil {
 		log.Fatal(err)
@@ -170,8 +174,56 @@ func (p *Application) listenAndServe(listen string, mux *http.ServeMux, sem chan
 	sem <- 0
 }
 
+func valAction(req *Request) reflect.Value {
+	cm, ok := controllers[req.Module]
+	if !ok {
+		panic(fmt.Sprintf("Controller [%s] not found\n", req.Module))
+	}
+	controller, ok := cm[req.Module+req.Controller]
+	if !ok {
+		panic(fmt.Sprintf("Controller [%s::%s] not found\n", req.Module, req.Controller))
+	}
+
+	rq := controller.Elem().FieldByName("Request")
+	rq.Set(reflect.ValueOf(req))
+
+	method := req.Action
+
+	// Action
+	action := controller.MethodByName(method)
+	if action.IsValid() == false {
+		panic(fmt.Sprintf("Method [%s] not found\n", method))
+	}
+
+	return action
+}
+
+func valArgs(req *Request, action reflect.Value) []reflect.Value {
+	typ := action.Type()
+	numIn := typ.NumIn()
+	if len(req.args) != numIn {
+		panic(fmt.Sprintf("Method [%s]'s in arguments wrong\n", req.Action))
+	}
+
+	// Arguments
+	in := make([]reflect.Value, numIn)
+	for i := 0; i < numIn; i++ {
+		actionIn := typ.In(i)
+		kind := actionIn.Kind()
+		v, err := parameterConversion(req.args[i], kind)
+		if err != nil {
+			panic(fmt.Sprintf("%s paramters error, string convert to %s failed: %s\n", req.Action, kind, req.args[i]))
+		}
+
+		in[i] = v
+		req.Args[actionIn.Name()] = v
+	}
+
+	return in
+}
+
 //Every request run this function
-func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
+func handleRequest(fn ActionLoadFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -183,61 +235,26 @@ func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
 		fmt.Print("\n\n")
 
 		req := NewRequest(r)
+
+		//log.Printf("%#v\n", req)
 		console.Dump(req)
 
-		cm, ok := controllers[req.Module]
-		if !ok {
-			panic(fmt.Sprintf("Controller [%s] not found\n", req.Module))
-		}
-		controller, ok := cm[req.Module+req.Controller]
-		if !ok {
-			panic(fmt.Sprintf("Controller [%s::%s] not found\n", req.Module, req.Controller))
-		}
-
-		//Invoke Load()
+		// Invoke Load()
 		if fn != nil {
-			if inited := fn(req); inited.Data.(int) < 0 {
-				panic(fmt.Sprintf("Load falure: %s\n", inited.Err))
+			if code, err := fn(r, req); code < 0 {
+				panic(fmt.Sprintf("Load failed: %s\n", err))
 			}
 		}
 
-		rq := controller.Elem().FieldByName("Request")
-		rq.Set(reflect.ValueOf(req))
+		action := valAction(req)
 
-		method := req.Action
+		log.Printf("Method [%s] found\n", req.Action)
 
-		//action
-		action := controller.MethodByName(method)
-		if action.IsValid() == false {
-			panic(fmt.Sprintf("Method [%s] not found\n", method))
-		}
+		args := valArgs(req, action)
 
-		log.Printf("Method [%s] found\n", method)
-
-		typ := action.Type()
-		numIn := typ.NumIn()
-		if len(req.args) != numIn {
-			panic(fmt.Sprintf("Method [%s]'s in arguments wrong\n", method))
-		}
-
-		// Arguments
-		in := make([]reflect.Value, numIn)
-		for i := 0; i < numIn; i++ {
-			actionIn := typ.In(i)
-			kind := actionIn.Kind()
-			v, err := parameterConversion(req.args[i], kind)
-			if err != nil {
-				panic(fmt.Sprintf("%s paramters error, string convert to %s failed: %s\n", method, kind, req.args[i]))
-			}
-
-			in[i] = v
-			req.Args[actionIn.Name()] = v
-		}
-
-		// Run...
-		ret := action.Call(in)
-
-		result := ret[0].Interface().(Result)
+		// Execute action
+		ret := action.Call(args)
+		result := ret[0].Interface().(ActionResult)
 		if result.Err != "" {
 			panic(fmt.Sprintf("Execute error: %v\n", result.Err))
 		}
@@ -248,7 +265,7 @@ func NewHandler(fn ActionLoadFunc) http.HandlerFunc {
 			panic(fmt.Sprintf("json.Marshal: %v\n", err))
 		}
 
-		// Render
+		// Write to output
 		_, err = w.Write(v)
 		if err != nil {
 			panic(fmt.Sprintf("ResponseWriter.Write: %v\n", err))

@@ -10,7 +10,7 @@ import (
 )
 
 // Action result
-type Result struct {
+type ActionResult struct {
 	// Data
 	Data interface{} `json:"data"`
 
@@ -22,13 +22,10 @@ type Result struct {
 var controllers map[string]map[string]reflect.Value = make(map[string]map[string]reflect.Value)
 
 // Action load function
-type ActionLoadFunc func(r *Request) Result
+type ActionLoadFunc func(r *http.Request, req *Request) (int, string)
 
 // App
 var App Application
-
-// *http.ServeMux
-var muxList = make(map[string]*http.ServeMux)
 
 // Alias of map[string]interface{}
 type BodyJson map[string]interface{}

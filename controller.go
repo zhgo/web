@@ -15,13 +15,13 @@ type Controller struct {
 }
 
 // Failure
-func (c *Controller) Fail(err error) Result {
-	return Result{"", err.Error()}
+func (c *Controller) Fail(err error) ActionResult {
+	return ActionResult{"", err.Error()}
 }
 
 // Success
-func (c *Controller) Done(data interface{}) Result {
-	return Result{data, ""}
+func (c *Controller) Done(data interface{}) ActionResult {
+	return ActionResult{data, ""}
 }
 
 // New router register
