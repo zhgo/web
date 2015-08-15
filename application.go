@@ -28,20 +28,8 @@ type Application struct {
 	// module list
 	Modules map[string]Module
 
-	// *http.ServeMux
+	// Mux map group by listen
 	muxList map[string]*http.ServeMux
-}
-
-// Module struct
-type Module struct {
-	// module name
-	Name string
-
-	// Listen
-	Listen string
-
-	// key of DB Server
-	DB db.Server
 }
 
 // Host struct
@@ -59,11 +47,23 @@ type Host struct {
 	Root string
 }
 
+// Module struct
+type Module struct {
+	// module name
+	Name string
+
+	// Listen
+	Listen string
+
+	// key of DB Server
+	DB db.Server
+}
+
 // Init
-func (app *Application) Init(path string) {
+func (app *Application) Init() {
 	// Load config file
-	r := map[string]string{"{WorkingDir}": console.WorkingDir}
-	console.NewConfig(path).Replace(r).Parse(app)
+	replaces := map[string]string{"{WorkingDir}": console.WorkingDir}
+	console.NewConfig("zhgo.json").Replace(replaces).Parse(app)
 
 	// Default Listen
 	if app.Listen == "" {
@@ -113,15 +113,10 @@ func (app *Application) Init(path string) {
 	}
 
 	app.muxList = make(map[string]*http.ServeMux)
-
-	//log.Printf("%#v\n", app)
-	console.Dump(app)
-	//log.Printf("%#v\n", controllers)
-	console.Dump(controllers)
 }
 
 // Load
-func (app *Application) Load(fn ActionLoadFunc) {
+func (app *Application) Load() {
 	// hosts
 	for _, m := range app.Hosts {
 		if _, ok := app.muxList[m.Listen]; !ok {
@@ -137,27 +132,18 @@ func (app *Application) Load(fn ActionLoadFunc) {
 			app.muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
 		}
 	}
-
-	// modules
-	for mName, m := range app.Modules {
-		if _, ok := app.muxList[m.Listen]; !ok {
-			app.muxList[m.Listen] = http.NewServeMux()
-		}
-
-		app.muxList[m.Listen].HandleFunc("/"+mName+"/", handleRequest(fn))
-	}
-
-	//log.Printf("%#v\n", app.muxList)
-	console.Dump(app.muxList)
 }
 
 // Start HTPP server
 func (app *Application) Start() {
+	//log.Printf("%#v\n", app)
+	console.Dump(app)
+
 	l := len(app.muxList)
 	sem := make(chan int, l)
 
 	for listen, mux := range app.muxList {
-		go app.listenAndServe(listen, mux, sem)
+		go listenAndServe(listen, mux, sem)
 	}
 
 	for i := 0; i < l; i++ {
@@ -166,7 +152,7 @@ func (app *Application) Start() {
 }
 
 //new host
-func (app *Application) listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
+func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
 	err := http.ListenAndServe(listen, mux)
 	if err != nil {
 		log.Fatal(err)
@@ -174,56 +160,34 @@ func (app *Application) listenAndServe(listen string, mux *http.ServeMux, sem ch
 	sem <- 0
 }
 
-func valAction(req *Request) reflect.Value {
-	cm, ok := controllers[req.Module]
-	if !ok {
-		panic(fmt.Sprintf("Controller [%s] not found\n", req.Module))
-	}
-	controller, ok := cm[req.Module+req.Controller]
-	if !ok {
-		panic(fmt.Sprintf("Controller [%s::%s] not found\n", req.Module, req.Controller))
-	}
-
-	rq := controller.Elem().FieldByName("Request")
-	rq.Set(reflect.ValueOf(req))
-
-	method := req.Action
-
-	// Action
-	action := controller.MethodByName(method)
-	if action.IsValid() == false {
-		panic(fmt.Sprintf("Method [%s] not found\n", method))
-	}
-
-	return action
+func Start() {
+	App.Start()
 }
 
-func valArgs(req *Request, action reflect.Value) []reflect.Value {
-	typ := action.Type()
-	numIn := typ.NumIn()
-	if len(req.args) != numIn {
-		panic(fmt.Sprintf("Method [%s]'s in arguments wrong\n", req.Action))
-	}
-
-	// Arguments
-	in := make([]reflect.Value, numIn)
-	for i := 0; i < numIn; i++ {
-		actionIn := typ.In(i)
-		kind := actionIn.Kind()
-		v, err := parameterConversion(req.args[i], kind)
-		if err != nil {
-			panic(fmt.Sprintf("%s paramters error, string convert to %s failed: %s\n", req.Action, kind, req.args[i]))
-		}
-
-		in[i] = v
-		req.Args[actionIn.Name()] = v
-	}
-
-	return in
+// Failure
+func Fail(err error) ActionResult {
+	return ActionResult{"", err.Error()}
 }
 
-//Every request run this function
-func handleRequest(fn ActionLoadFunc) http.HandlerFunc {
+// Success
+func Done(data interface{}) ActionResult {
+	return ActionResult{data, ""}
+}
+
+func NewHandle(module string, pattern string, c Controller) {
+	m, ok := App.Modules[module]
+	if !ok {
+		log.Fatalf("Module not found: %s\n", module)
+	}
+
+	if _, ok = App.muxList[m.Listen]; !ok {
+		App.muxList[m.Listen] = http.NewServeMux()
+	}
+
+	App.muxList[m.Listen].HandleFunc(pattern, Handle(reflect.TypeOf(c).Elem()))
+}
+
+func Handle(c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -234,27 +198,27 @@ func handleRequest(fn ActionLoadFunc) http.HandlerFunc {
 
 		fmt.Print("\n\n")
 
+		cp := reflect.New(c).Interface().(Controller)
+
+		console.Dump(cp)
+
 		req := NewRequest(r)
 
 		//log.Printf("%#v\n", req)
 		console.Dump(req)
 
-		// Invoke Load()
-		if fn != nil {
-			if code, err := fn(r, req); code < 0 {
-				panic(fmt.Sprintf("Load failed: %s\n", err))
-			}
+		err := json.NewDecoder(r.Body).Decode(&cp)
+		if err != nil {
+			log.Printf("%v\n", err)
 		}
 
-		action := valAction(req)
-
-		log.Printf("Method [%s] found\n", req.Action)
-
-		args := valArgs(req, action)
+		// Load()
+		if err := cp.Load(req); err != nil {
+			panic(fmt.Sprintf("Load failed: %s\n", err))
+		}
 
 		// Execute action
-		ret := action.Call(args)
-		result := ret[0].Interface().(ActionResult)
+		result := cp.Render(req)
 		if result.Err != "" {
 			panic(fmt.Sprintf("Execute error: %v\n", result.Err))
 		}

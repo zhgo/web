@@ -4,12 +4,9 @@
 
 package web
 
-import (
-	"net/http"
-)
+import ()
 
-// Action load function
-type ActionLoadFunc func(r *http.Request, req *Request) (int, string)
-
-// App
-var App Application
+func init() {
+	App.Init()
+	App.Load()
+}
