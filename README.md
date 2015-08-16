@@ -4,6 +4,11 @@ This is a special API server based on http protocol, only accept POST method, al
 
 It's not like RESTful that allows GET, POST, PUT, DELETE and so on, it only allows POST methods.
 
+[![Build Status](https://travis-ci.org/zhgo/web.svg)](https://travis-ci.org/zhgo/web)
+[![Coverage Status](https://coveralls.io/repos/zhgo/web/badge.svg)](https://coveralls.io/r/zhgo/web)
+[![GoDoc](https://godoc.org/github.com/zhgo/web?status.png)](http://godoc.org/github.com/zhgo/web)
+[![License](https://img.shields.io/badge/license-BSD-blue.svg?style=flat)](https://github.com/zhgo/web/blob/master/LICENSE)
+
 # Feature
 
 * Standalone server
@@ -65,8 +70,8 @@ http://localhost/Passport/UserList
 [{"name": "John", "gender": "male"}]
 ```
 
+# Copyright
 
-[![Build Status](https://travis-ci.org/zhgo/web.svg)](https://travis-ci.org/zhgo/web)
-[![Coverage Status](https://coveralls.io/repos/zhgo/web/badge.svg)](https://coveralls.io/r/zhgo/web)
-[![GoDoc](https://godoc.org/github.com/zhgo/web?status.png)](http://godoc.org/github.com/zhgo/web)
-[![License](https://img.shields.io/badge/license-BSD-blue.svg?style=flat)](https://github.com/zhgo/web/blob/master/LICENSE)
+Copyright 2015 The zhgo Authors. All rights reserved.
+
+Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
