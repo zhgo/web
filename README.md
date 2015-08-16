@@ -6,10 +6,65 @@ It's not like RESTful that allows GET, POST, PUT, DELETE and so on, it only allo
 
 # Feature
 
-** Standalone server
-** Support multiple ports
-** Only support POST method
-** Only support JSON format
+* Standalone server
+* Only support POST method
+* Only support JSON format
+* Support multiple ports
+* No custom routers
+* One action is a struct, not a struct method
+
+# Example
+
+```go
+package passport
+
+import (
+    "github.com/zhgo/web"
+)
+
+type UserList struct {
+    
+}
+
+// This is only a example and keep it empty
+func (c *UserList) Load(module, action string, r *http.Request) error {
+    return nil
+}
+
+func (c *UserList) Render() web.ActionResult {
+    d := map[string]string{"name": "John", "gender": "male"}
+    list := []map[string]string{d}
+    return web.Done(list)
+}
+
+func init() {
+    web.NewHandle(new(UserList))
+}
+```
+
+The UserList is action. Now you can write a main function call action above:
+
+```go
+package main
+
+import (
+    "github.com/zhgo/web"
+    _ "passport" 
+)
+
+func main() {
+    web.Start()
+}
+```
+
+Then open browser and type this words in address input box:
+
+http://localhost/Passport/UserList
+
+```shell
+[{"name": "John", "gender": "male"}]
+```
+
 
 [![Build Status](https://travis-ci.org/zhgo/web.svg)](https://travis-ci.org/zhgo/web)
 [![Coverage Status](https://coveralls.io/repos/zhgo/web/badge.svg)](https://coveralls.io/r/zhgo/web)
