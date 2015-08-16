@@ -2,7 +2,7 @@
 
 This is a special API server based on http protocol, only accept POST method, all incoming parameters are stored in the request body and must be JSON format, and can only output data in JSON format.
 
-It's not like RESTful that allows GET, POST, PUT, DELETE and so on, it only allows POST methods.
+It's not like RESTful that allows GET, POST, PUT, DELETE and so on, **it only allows POST methods**.
 
 [![Build Status](https://travis-ci.org/zhgo/web.svg)](https://travis-ci.org/zhgo/web)
 [![Coverage Status](https://coveralls.io/repos/zhgo/web/badge.svg)](https://coveralls.io/r/zhgo/web)
