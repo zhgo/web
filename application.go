@@ -12,21 +12,25 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strings"
 )
+
+// App
+var App Application
 
 // Application struct
 type Application struct {
 	// Environment 0:development 1:testing 2:staging 3:production
-	Environment int8
+	Env int8 `json:"env"`
 
 	// Listen address and port
-	Listen string
+	Listen string `json:"listen"`
 
 	// Host list
-	Hosts map[string]Host
+	Hosts map[string]Host `json:"hosts"`
 
 	// module list
-	Modules map[string]Module
+	Modules map[string]Module `json:"modules"`
 
 	// Mux map group by listen
 	muxList map[string]*http.ServeMux
@@ -35,28 +39,28 @@ type Application struct {
 // Host struct
 type Host struct {
 	//
-	Name string
+	Name string `json:"name"`
 
 	// Listen
-	Listen string
+	Listen string `json:"listen"`
 
 	// Path
-	Path string
+	Path string `json:"path"`
 
 	// Root
-	Root string
+	Root string `json:"root"`
 }
 
 // Module struct
 type Module struct {
 	// module name
-	Name string
+	Name string `json:"name"`
 
 	// Listen
-	Listen string
+	Listen string `json:"listen"`
 
 	// key of DB Server
-	DB db.Server
+	DB db.Server `json:"db"`
 }
 
 // Init
@@ -160,21 +164,18 @@ func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
 	sem <- 0
 }
 
-func Start() {
-	App.Start()
-}
+func NewHandle(c Controller) {
+	ct := reflect.TypeOf(c).Elem()
 
-// Failure
-func Fail(err error) ActionResult {
-	return ActionResult{"", err.Error()}
-}
+	la := strings.Split(ct.String(), ".")
+	if len(la) != 2 {
+		log.Fatalf("ct.String() parase error: %s\n", ct.String())
+	}
 
-// Success
-func Done(data interface{}) ActionResult {
-	return ActionResult{data, ""}
-}
+	module := strings.Title(la[0])
+	action := la[1]
+	pattern := fmt.Sprintf("/%s/%s", module, action)
 
-func NewHandle(module string, pattern string, c Controller) {
 	m, ok := App.Modules[module]
 	if !ok {
 		log.Fatalf("Module not found: %s\n", module)
@@ -184,10 +185,10 @@ func NewHandle(module string, pattern string, c Controller) {
 		App.muxList[m.Listen] = http.NewServeMux()
 	}
 
-	App.muxList[m.Listen].HandleFunc(pattern, Handle(reflect.TypeOf(c).Elem()))
+	App.muxList[m.Listen].HandleFunc(pattern, handle(module, action, ct))
 }
 
-func Handle(c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
+func handle(module, action string, c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -199,13 +200,7 @@ func Handle(c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
 		fmt.Print("\n\n")
 
 		cp := reflect.New(c).Interface().(Controller)
-
 		console.Dump(cp)
-
-		req := NewRequest(r)
-
-		//log.Printf("%#v\n", req)
-		console.Dump(req)
 
 		err := json.NewDecoder(r.Body).Decode(&cp)
 		if err != nil {
@@ -213,12 +208,12 @@ func Handle(c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Load()
-		if err := cp.Load(req); err != nil {
+		if err := cp.Load(module, action, r); err != nil {
 			panic(fmt.Sprintf("Load failed: %s\n", err))
 		}
 
 		// Execute action
-		result := cp.Render(req)
+		result := cp.Render()
 		if result.Err != "" {
 			panic(fmt.Sprintf("Execute error: %v\n", result.Err))
 		}
@@ -235,4 +230,13 @@ func Handle(c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
 			panic(fmt.Sprintf("ResponseWriter.Write: %v\n", err))
 		}
 	}
+}
+
+func Start() {
+	App.Start()
+}
+
+func init() {
+	App.Init()
+	App.Load()
 }

@@ -4,12 +4,14 @@
 
 package web
 
-import ()
+import (
+	"net/http"
+)
 
 // Controller interface
 type Controller interface {
-	Load(req *Request) error
-	Render(req *Request) ActionResult
+	Load(module, action string, r *http.Request) error
+	Render() ActionResult
 }
 
 // Action result

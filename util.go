@@ -6,7 +6,12 @@ package web
 
 import ()
 
-func init() {
-	App.Init()
-	App.Load()
+// Failure
+func Fail(err error) ActionResult {
+	return ActionResult{"", err.Error()}
+}
+
+// Success
+func Done(data interface{}) ActionResult {
+	return ActionResult{data, ""}
 }
