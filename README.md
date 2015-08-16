@@ -1,4 +1,4 @@
-# Web --- Package for build web backend server (HTTP protocol, POST method, JSON format)
+# Package for build web backend server
 
 This is a special API server based on http protocol, only accept POST method, all incoming parameters are stored in the request body and must be JSON format, and can only output data in JSON format.
 
@@ -69,6 +69,10 @@ http://localhost/Passport/UserList
 ```shell
 [{"name": "John", "gender": "male"}]
 ```
+
+This is only a demo, not for production. If you want to use in project, Careful planning module first.
+
+Remember HTTP protocol, POST method and JSON format.
 
 # Copyright
 
