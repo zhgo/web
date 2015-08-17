@@ -6,12 +6,8 @@ package web
 
 import ()
 
-// Failure
-func Fail(err error) ActionResult {
-	return ActionResult{"", err.Error()}
-}
+// Working Directory
+var WorkingDir string
 
-// Success
-func Done(data interface{}) ActionResult {
-	return ActionResult{data, ""}
-}
+// Application
+var app Application

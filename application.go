@@ -5,18 +5,12 @@
 package web
 
 import (
-	"encoding/json"
-	"fmt"
-	"github.com/zhgo/console"
+	"github.com/zhgo/config"
 	"github.com/zhgo/db"
+	"github.com/zhgo/dump"
 	"log"
 	"net/http"
-	"reflect"
-	"strings"
 )
-
-// App
-var App Application
 
 // Application struct
 type Application struct {
@@ -66,8 +60,8 @@ type Module struct {
 // Init
 func (app *Application) Init() {
 	// Load config file
-	replaces := map[string]string{"{WorkingDir}": console.WorkingDir}
-	console.NewConfig("zhgo.json").Replace(replaces).Parse(app)
+	replaces := map[string]string{"{WorkingDir}": WorkingDir}
+	config.NewConfig("zhgo.json").Replace(replaces).Parse(app)
 
 	// Default Listen
 	if app.Listen == "" {
@@ -79,7 +73,7 @@ func (app *Application) Init() {
 		app.Hosts = make(map[string]Host)
 	}
 	if _, ok := app.Hosts["Public"]; !ok {
-		app.Hosts["Public"] = Host{Path: "/", Root: console.WorkingDir + "/public"}
+		app.Hosts["Public"] = Host{Path: "/", Root: WorkingDir + "/public"}
 	}
 
 	// Host property
@@ -141,7 +135,7 @@ func (app *Application) Load() {
 // Start HTPP server
 func (app *Application) Start() {
 	//log.Printf("%#v\n", app)
-	console.Dump(app)
+	dump.Dump(app)
 
 	l := len(app.muxList)
 	sem := make(chan int, l)
@@ -155,6 +149,10 @@ func (app *Application) Start() {
 	}
 }
 
+func Start() {
+	app.Start()
+}
+
 //new host
 func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
 	err := http.ListenAndServe(listen, mux)
@@ -162,81 +160,4 @@ func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
 		log.Fatal(err)
 	}
 	sem <- 0
-}
-
-func NewHandle(c Controller) {
-	ct := reflect.TypeOf(c).Elem()
-
-	la := strings.Split(ct.String(), ".")
-	if len(la) != 2 {
-		log.Fatalf("ct.String() parase error: %s\n", ct.String())
-	}
-
-	module := strings.Title(la[0])
-	action := la[1]
-	pattern := fmt.Sprintf("/%s/%s", module, action)
-
-	m, ok := App.Modules[module]
-	if !ok {
-		log.Fatalf("Module not found: %s\n", module)
-	}
-
-	if _, ok = App.muxList[m.Listen]; !ok {
-		App.muxList[m.Listen] = http.NewServeMux()
-	}
-
-	App.muxList[m.Listen].HandleFunc(pattern, handle(module, action, ct))
-}
-
-func handle(module, action string, c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf(r.(string))
-				http.Error(w, r.(string), http.StatusBadRequest)
-			}
-		}()
-
-		fmt.Print("\n\n")
-
-		cp := reflect.New(c).Interface().(Controller)
-		console.Dump(cp)
-
-		err := json.NewDecoder(r.Body).Decode(&cp)
-		if err != nil {
-			log.Printf("%v\n", err)
-		}
-
-		// Load()
-		if err := cp.Load(module, action, r); err != nil {
-			panic(fmt.Sprintf("Load failed: %s\n", err))
-		}
-
-		// Execute action
-		result := cp.Render()
-		if result.Err != "" {
-			panic(fmt.Sprintf("Execute error: %v\n", result.Err))
-		}
-
-		// JSON Marshal
-		v, err := json.Marshal(result.Data)
-		if err != nil {
-			panic(fmt.Sprintf("json.Marshal: %v\n", err))
-		}
-
-		// Write to output
-		_, err = w.Write(v)
-		if err != nil {
-			panic(fmt.Sprintf("ResponseWriter.Write: %v\n", err))
-		}
-	}
-}
-
-func Start() {
-	App.Start()
-}
-
-func init() {
-	App.Init()
-	App.Load()
 }
