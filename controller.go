@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/zhgo/dump"
+	"github.com/zhgo/nameconv"
 	"log"
 	"net/http"
 	"reflect"
@@ -16,12 +17,12 @@ import (
 
 // Controller interface
 type Controller interface {
-	Load(module, action string, r *http.Request) error
-	Render() ActionResult
+	Load(mdl, obj, act string, r *http.Request) error
+	Render() Result
 }
 
 // Action result
-type ActionResult struct {
+type Result struct {
 	// Data
 	Data interface{} `json:"data"`
 
@@ -29,41 +30,46 @@ type ActionResult struct {
 	Err string `json:"err"`
 }
 
+// Registe Controller
 func NewController(c Controller) {
 	ct := reflect.TypeOf(c).Elem()
-
-	la := strings.Split(ct.String(), ".")
-	if len(la) != 2 {
-		log.Fatalf("ControllerType.String() parase error: %s\n", ct.String())
+	la := nameconv.CamelcaseToSlice(ct.Name(), false, -1)
+	if len(la) < 3 {
+		log.Fatalf("ControllerType.Name() parase error: %s\n", ct.Name())
 	}
 
-	module := strings.Title(la[0])
-	action := la[1]
-	pattern := fmt.Sprintf("/%s/%s", module, action)
+	l := len(la)
+	mdl := la[0]
+	obj := strings.Join(la[1:l-1], "")
+	act := strings.Join(la[l-1:], "")
+	pattern := fmt.Sprintf("/%s/%s/%s", mdl, obj, act)
 
-	m, ok := app.Modules[module]
+	log.Printf("%#v\n", pattern)
+
+	m, ok := app.Modules[mdl]
 	if !ok {
-		log.Fatalf("Module not found: %s\n", module)
+		log.Fatalf("Module not found: %s\n", mdl)
 	}
 
 	if _, ok = app.muxList[m.Listen]; !ok {
 		app.muxList[m.Listen] = http.NewServeMux()
 	}
 
-	app.muxList[m.Listen].HandleFunc(pattern, handle(module, action, ct))
+	app.muxList[m.Listen].HandleFunc(pattern, handle(mdl, obj, act, ct))
 }
 
 // Failure
-func Fail(err error) ActionResult {
-	return ActionResult{"", err.Error()}
+func Fail(err error) Result {
+	return Result{"", err.Error()}
 }
 
 // Success
-func Done(data interface{}) ActionResult {
-	return ActionResult{data, ""}
+func Done(data interface{}) Result {
+	return Result{data, ""}
 }
 
-func handle(module, action string, c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
+// Handle request
+func handle(mdl, obj, act string, c reflect.Type) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -83,7 +89,7 @@ func handle(module, action string, c reflect.Type) func(w http.ResponseWriter, r
 		}
 
 		// Load()
-		if err := cp.Load(module, action, r); err != nil {
+		if err := cp.Load(mdl, obj, act, r); err != nil {
 			panic(fmt.Sprintf("Load failed: %s\n", err))
 		}
 
