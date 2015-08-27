@@ -1,10 +1,11 @@
 {
   "environment": 0,
   "listen": "localhost:8081",
+  "db": {"type": "mysql", "dsn": "user:pass@tcp(localhost:3306)/passport?charset=utf8"},
   "hosts": {
     "public": {"name": "public", "path": "/", "root": "{WorkingDir}/public"}
   },
   "modules": {
-    "passport": {"db": {"type": "mysql", "dsn": "user:pass@tcp(localhost:3306)/passport?charset=utf8"}}
+    "passport": {}
   }
 }
