@@ -4,10 +4,12 @@
 
 package web
 
-import ()
+import (
+    "github.com/zhgo/config"
+)
 
 // Working Directory
-var WorkingDir string
+var WorkingDir string = config.WorkingDir()
 
 // Application
 var app Application

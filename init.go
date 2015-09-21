@@ -4,19 +4,10 @@
 
 package web
 
-import (
-	"log"
-	"os"
-)
+import ()
 
 func init() {
-	var err error
-	WorkingDir, err = os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
+    app.Init()
 
-	app.Init()
-
-	app.Load()
+    app.Load()
 }

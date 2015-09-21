@@ -6,7 +6,6 @@ package web
 
 import (
     "github.com/zhgo/config"
-    "github.com/zhgo/db"
     "github.com/zhgo/dump"
     "log"
     "net/http"
@@ -17,14 +16,11 @@ type Application struct {
     // Environment 0:development 1:testing 2:staging 3:production
     Env int8 `json:"env"`
 
-    // Listen address and port
-    Listen string `json:"listen"`
-
-    // db.Server
-    DB  db.Server `json:"db"`
-
     // Host list
     Hosts map[string]Host `json:"hosts"`
+
+    // Listen address and port
+    Listen string `json:"listen"`
 
     // module list
     Modules map[string]Module `json:"modules"`
@@ -55,9 +51,6 @@ type Module struct {
 
     // Listen
     Listen string `json:"listen"`
-
-    // key of DB Server
-    DB  db.Server `json:"db"`
 }
 
 // Init
@@ -104,15 +97,6 @@ func (app *Application) Init() {
         // app.Modules[k].Listen = app.Listen // cannot assign to p.Modules[k].Listen
         if v.Listen == "" {
             v.Listen = app.Listen
-        }
-
-        // db.Connections
-        if v.DB.DSN == "" && app.DB.DSN != "" {
-            v.DB = app.DB
-        }
-
-        if v.DB.DSN != "" {
-            db.Servers[v.Name] = &v.DB
         }
 
         app.Modules[k] = v
