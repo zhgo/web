@@ -8,6 +8,4 @@ import ()
 
 func init() {
     app.Init()
-
-    app.Load()
 }

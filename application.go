@@ -16,32 +16,17 @@ type Application struct {
     // Environment 0:development 1:testing 2:staging 3:production
     Env int8 `json:"env"`
 
-    // Host list
-    Hosts map[string]Host `json:"hosts"`
-
     // Listen address and port
     Listen string `json:"listen"`
+
+    // Host list
+    Hosts map[string]Host `json:"hosts"`
 
     // module list
     Modules map[string]Module `json:"modules"`
 
     // Mux map group by listen
     muxList map[string]*http.ServeMux
-}
-
-// Host struct
-type Host struct {
-    //
-    Name string `json:"name"`
-
-    // Listen
-    Listen string `json:"listen"`
-
-    // Path
-    Path string `json:"path"`
-
-    // Root
-    Root string `json:"root"`
 }
 
 // Module struct
@@ -69,9 +54,12 @@ func (app *Application) Init() {
         app.Hosts = make(map[string]Host)
     }
 
+    // Init muxList
+    app.muxList = make(map[string]*http.ServeMux)
+
     // Host root
-    if _, ok := app.Hosts["Public"]; !ok {
-        app.Hosts["Public"] = Host{Path: "/", Root: WorkingDir + "/public"}
+    if _, ok := app.Hosts["public"]; !ok {
+        app.Hosts["public"] = Host{Path: "/", Root: WorkingDir + "/public"}
     }
 
     // Host property
@@ -81,6 +69,7 @@ func (app *Application) Init() {
             v.Listen = app.Listen
         }
         app.Hosts[k] = v
+        NewHostHandle(app.Hosts[k])
     }
 
     // Default module
@@ -94,7 +83,9 @@ func (app *Application) Init() {
             v.Name = k
         }
 
-        // app.Modules[k].Listen = app.Listen // cannot assign to p.Modules[k].Listen
+        // cannot assign to p.Modules[k].Listen
+        // app.Modules[k].Listen = app.Listen
+
         if v.Listen == "" {
             v.Listen = app.Listen
         }
@@ -102,26 +93,6 @@ func (app *Application) Init() {
         app.Modules[k] = v
     }
 
-    app.muxList = make(map[string]*http.ServeMux)
-}
-
-// Load
-func (app *Application) Load() {
-    // hosts
-    for _, m := range app.Hosts {
-        if _, ok := app.muxList[m.Listen]; !ok {
-            app.muxList[m.Listen] = http.NewServeMux()
-        }
-
-        if m.Path == "/" {
-            app.muxList[m.Listen].Handle(m.Path, http.FileServer(http.Dir(m.Root)))
-        } else {
-            // To serve a directory on disk (/tmp) under an alternate URL
-            // path (/tmpfiles/), use StripPrefix to modify the request
-            // URL's path before the FileServer sees it:
-            app.muxList[m.Listen].Handle(m.Path, http.StripPrefix(m.Path, http.FileServer(http.Dir(m.Root))))
-        }
-    }
 }
 
 // Start HTPP server
@@ -133,16 +104,13 @@ func (app *Application) Start() {
     sem := make(chan int, l)
 
     for listen, mux := range app.muxList {
+        log.Printf("%#v\n", listen)
         go listenAndServe(listen, mux, sem)
     }
 
     for i := 0; i < l; i++ {
         <-sem
     }
-}
-
-func Start() {
-    app.Start()
 }
 
 //new host
@@ -152,4 +120,8 @@ func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
         log.Fatal(err)
     }
     sem <- 0
+}
+
+func Start() {
+    app.Start()
 }
