@@ -52,6 +52,16 @@ func NewController(c Controller, patterns ...string) {
 }
 
 // Failure
+func Error(err string) Result {
+    return Result{"", err}
+}
+
+// Failure
+func Errorf(format string, v ...interface{}) Result {
+    return Result{"", fmt.Sprintf(format, v...)}
+}
+
+// Failure
 func Fail(err error) Result {
     return Result{"", err.Error()}
 }
