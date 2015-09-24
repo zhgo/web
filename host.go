@@ -5,6 +5,8 @@
 package web
 
 import (
+    "errors"
+    "log"
     "net/http"
 )
 
@@ -23,7 +25,11 @@ type Host struct {
     Root string `json:"root"`
 }
 
-func NewHostHandle(m Host) {
+func NewHost(m Host) {
+    if started {
+        log.Fatal(errors.New("Cannot add host handle, Server is running."))
+    }
+
     if _, ok := app.muxList[m.Listen]; !ok {
         app.muxList[m.Listen] = http.NewServeMux()
     }

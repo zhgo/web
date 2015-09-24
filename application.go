@@ -6,8 +6,6 @@ package web
 
 import (
     "github.com/zhgo/config"
-    "github.com/zhgo/dump"
-    "log"
     "net/http"
 )
 
@@ -29,20 +27,11 @@ type Application struct {
     muxList map[string]*http.ServeMux
 }
 
-// Module struct
-type Module struct {
-    // module name
-    Name string `json:"name"`
-
-    // Listen
-    Listen string `json:"listen"`
-}
-
 // Init
-func (app *Application) Init() {
+func applicationInit() {
     // Load config file
     replaces := map[string]string{"{WorkingDir}": WorkingDir}
-    config.NewConfig("zhgo.json").Replace(replaces).Parse(app)
+    config.NewConfig("zhgo.json").Replace(replaces).Parse(&app)
 
     // Default Listen
     if app.Listen == "" {
@@ -54,7 +43,12 @@ func (app *Application) Init() {
         app.Hosts = make(map[string]Host)
     }
 
-    // Init muxList
+    // Default module
+    if app.Modules == nil {
+        app.Modules = make(map[string]Module)
+    }
+
+    // Initalate muxList
     app.muxList = make(map[string]*http.ServeMux)
 
     // Host root
@@ -62,22 +56,17 @@ func (app *Application) Init() {
         app.Hosts["public"] = Host{Path: "/", Root: WorkingDir + "/public"}
     }
 
-    // Host property
+    // Hosts
     for k, v := range app.Hosts {
         v.Name = k
         if v.Listen == "" {
             v.Listen = app.Listen
         }
         app.Hosts[k] = v
-        NewHostHandle(app.Hosts[k])
+        NewHost(app.Hosts[k])
     }
 
-    // Default module
-    if app.Modules == nil {
-        app.Modules = make(map[string]Module)
-    }
-
-    // Module property
+    // Modules
     for k, v := range app.Modules {
         if v.Name == "" {
             v.Name = k
@@ -92,36 +81,4 @@ func (app *Application) Init() {
 
         app.Modules[k] = v
     }
-
-}
-
-// Start HTPP server
-func (app *Application) Start() {
-    //log.Printf("%#v\n", app)
-    dump.Dump(app)
-
-    l := len(app.muxList)
-    sem := make(chan int, l)
-
-    for listen, mux := range app.muxList {
-        log.Printf("%#v\n", listen)
-        go listenAndServe(listen, mux, sem)
-    }
-
-    for i := 0; i < l; i++ {
-        <-sem
-    }
-}
-
-//new host
-func listenAndServe(listen string, mux *http.ServeMux, sem chan int) {
-    err := http.ListenAndServe(listen, mux)
-    if err != nil {
-        log.Fatal(err)
-    }
-    sem <- 0
-}
-
-func Start() {
-    app.Start()
 }

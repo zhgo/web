@@ -6,6 +6,7 @@ package web
 
 import (
     "encoding/json"
+    "errors"
     "fmt"
     "github.com/zhgo/dump"
     "log"
@@ -20,17 +21,12 @@ type Controller interface {
     Render() Result
 }
 
-// Action result
-type Result struct {
-    // Data
-    Data interface{} `json:"data"`
-
-    // error
-    Err string `json:"err"`
-}
-
 // Registe Controller
 func NewController(c Controller, patterns ...string) {
+    if started {
+        log.Fatal(errors.New("Cannot registe controller, Server is running."))
+    }
+
     ct := reflect.TypeOf(c).Elem()
 
     strSli := strings.Split(ct.String(), ".")

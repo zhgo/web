@@ -6,6 +6,8 @@ package web
 
 import ()
 
+// Package level initalation container
 func init() {
-    app.Init()
+    // Everythong must do after application initalaed.
+    applicationInit()
 }
